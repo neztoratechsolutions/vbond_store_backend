@@ -25,6 +25,7 @@ from app.models.order_status_history import OrderStatusHistory
 
 
 from app.models.delivery import Delivery
+from app.models.user import User
 
 
 def create_tables():
