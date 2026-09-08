@@ -1,5 +1,12 @@
 from fastapi import FastAPI
 
+from app.database import Base, engine
+from app.models.customer import Customer
+
+# routers
+
+from app.routers import customer
+
 
 app = FastAPI(
     title="VBOND Store API",
@@ -7,10 +14,6 @@ app = FastAPI(
 )
 
 
-@app.get("/")
-def root():
-    return {
-        "message": "VBOND Store API is running"
-    }
 
-    
+# Include routers
+app.include_router(customer.router)
