@@ -1,6 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    status
+)
+
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
+from datetime import date, datetime, time, timedelta
+
+
 
 from app.database import get_db
 from app.models.customer import Customer
@@ -87,20 +97,71 @@ def create_customer(
 # GET ALL CUSTOMERS
 # ==========================================================
 
+
 @router.get(
     "/",
     response_model=list[CustomerResponse],
     status_code=status.HTTP_200_OK
 )
 def get_all_customers(
+    page: int | None = Query(
+        None,
+        ge=1,
+        description="Optional page number"
+    ),
+    start_date: date | None = Query(
+        None,
+        description="Start date in YYYY-MM-DD format"
+    ),
+    end_date: date | None = Query(
+        None,
+        description="End date in YYYY-MM-DD format"
+    ),
     db: Session = Depends(get_db)
 ):
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start date cannot be greater than end date"
+        )
 
-    customers = (
-        db.query(Customer)
-        .order_by(Customer.id.desc())
-        .all()
-    )
+    query = db.query(Customer)
+
+    # Start date filter
+    if start_date:
+        start_datetime = datetime.combine(
+            start_date,
+            time.min
+        )
+
+        query = query.filter(
+            Customer.created_at >= start_datetime
+        )
+
+    # End date filter - inclusive
+    if end_date:
+        next_day = end_date + timedelta(days=1)
+
+        end_datetime = datetime.combine(
+            next_day,
+            time.min
+        )
+
+        query = query.filter(
+            Customer.created_at < end_datetime
+        )
+
+    query = query.order_by(Customer.id.desc())
+
+    # Pagination only when page is provided
+    if page is not None:
+        page_size = 10
+
+        offset = (page - 1) * page_size
+
+        query = query.offset(offset).limit(page_size)
+
+    customers = query.all()
 
     return customers
 
