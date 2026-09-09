@@ -5,12 +5,14 @@ from app.database import Base, engine
 from app.models.customer import Customer
 from app.models.customer_address import CustomerAddress
 from app.models.category import Category
+from app.models.subcategory import Subcategory
 
 # routers
 
 from app.routers import customer
 from app.routers import address
 from app.routers import category
+from app.routers import subcategory
 
 
 app = FastAPI(
@@ -32,3 +34,4 @@ app.mount(
 app.include_router(customer.router)
 app.include_router(address.router)
 app.include_router(category.router)
+app.include_router(subcategory.router)
