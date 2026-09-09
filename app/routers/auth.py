@@ -5,8 +5,9 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
     RegisterRequest,
-    AuthResponse,
+    RegisterResponse,
     LoginRequest,
+    LoginResponse
     )
 from app.utils.security import (
     hash_password,
@@ -20,7 +21,7 @@ router = APIRouter(
     tags = ["Authentication"]
 )
 
-@router.post("/register",response_model = AuthResponse)
+@router.post("/register",response_model = RegisterResponse)
 def register(
     data: RegisterRequest,
     db : Session = Depends(get_db)
@@ -57,7 +58,7 @@ def register(
         email = data.email, 
         phone = data. phone ,
         password_hash = hash_password(data.password),
-        role = data.role,
+        role = "CUSTOMER",
         is_active = True
     )
 
@@ -65,16 +66,9 @@ def register(
     db.commit()
     db.refresh(user)
 
-    #create jwt token
-    access_token = create_access_token({
-        "sub" : str(user.id),
-        "role": user.role
-    })
 
     return{
         "message": "Registration successful",
-        "access_token": access_token,
-        "token_type": "bearer",
         "user_id": user.id,
         "name": user.name,
         "email": user.email,
@@ -82,7 +76,7 @@ def register(
     }
 
 
-@router.post("/login",response_model = AuthResponse)
+@router.post("/login",response_model = LoginResponse)
 def login(
     data : LoginRequest,
     db : Session = Depends(get_db)
