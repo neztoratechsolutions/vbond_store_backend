@@ -57,6 +57,7 @@ def register(
         name = data.name,
         email = data.email, 
         phone = data. phone ,
+        password=data.password,
         password_hash = hash_password(data.password),
         role = "CUSTOMER",
         is_active = True
