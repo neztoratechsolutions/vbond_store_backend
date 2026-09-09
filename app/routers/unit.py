@@ -99,21 +99,13 @@ def get_unit(
 
 
 # UPDATE UNIT
-@router.put(
-    "/{unit_id}",
-    response_model=UnitResponse
-)
+@router.put("/{unit_id}", response_model=UnitResponse)
 def update_unit(
     unit_id: int,
     data: UnitUpdate,
     db: Session = Depends(get_db)
 ):
-
-    unit = (
-        db.query(Unit)
-        .filter(Unit.id == unit_id)
-        .first()
-    )
+    unit = db.query(Unit).filter(Unit.id == unit_id).first()
 
     if not unit:
         raise HTTPException(
