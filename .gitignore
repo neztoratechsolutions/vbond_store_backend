@@ -5,7 +5,8 @@ env/
 
 
 # Alembic migrations
-alembic/versions/
+# Alembic
+alembic/
 alembic.ini
 
 # Uploaded files
