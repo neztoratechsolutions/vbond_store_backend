@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
 )
+
 from app.database import Base
 
 
