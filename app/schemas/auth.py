@@ -6,7 +6,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     phone: str
     password: str
-    role: Literal["CUSTOMER","ADMIN"] = "CUSTOMER"
+
 
 class RegisterResponse(BaseModel):
     message: str
