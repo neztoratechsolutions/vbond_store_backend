@@ -3,6 +3,14 @@ venv/
 env/
 .venv/
 
+
+# Alembic migrations
+alembic/versions/
+alembic.ini
+
+# Uploaded files
+uploads/
+
 # Python cache
 __pycache__/
 *.py[cod]
