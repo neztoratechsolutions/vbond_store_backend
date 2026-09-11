@@ -1,4 +1,13 @@
 from fastapi import FastAPI
+from app.database import Base, engine
+from app.models.user import User
+
+from app.routers.auth import router as auth_router
+from app.routers import customer
+from app.routers import admin
+from app.routers import unit
+from app.routers import product
+
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
@@ -43,6 +52,7 @@ app.include_router(admin.router)
 
 # Unit
 app.include_router(unit.router)
+app.include_router(product.router)
 
 # Address
 app.include_router(address.router)
