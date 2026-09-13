@@ -41,6 +41,13 @@ app = FastAPI(
 )
 
 
+app.mount(
+    "/uploads",
+    StaticFiles(directory="uploads"),
+    name="uploads"
+)
+
+
 # Authentication
 app.include_router(auth_router)
 
@@ -67,9 +74,3 @@ app.include_router(subcategory.router)
 app.include_router(product_image.router)
 
 
-# Static files
-app.mount(
-    "/uploads",
-    StaticFiles(directory="uploads"),
-    name="uploads"
-)
