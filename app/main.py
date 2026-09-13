@@ -7,7 +7,7 @@ from app.routers import customer
 from app.routers import admin
 from app.routers import unit
 from app.routers import product
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
@@ -40,7 +40,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.mount(
     "/uploads",
     StaticFiles(directory="uploads"),
