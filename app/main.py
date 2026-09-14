@@ -20,6 +20,7 @@ from app.models.category import Category
 from app.models.subcategory import Subcategory
 from app.models.product import Product
 from app.models.product_image import ProductImage
+from app.models.order import Order
 
 # Routers
 from app.routers.auth import router as auth_router
@@ -30,6 +31,7 @@ from app.routers import unit
 from app.routers import category
 from app.routers import subcategory
 from app.routers import product_image
+from app.routers import order
 
 
 Base.metadata.create_all(bind=engine)
@@ -84,4 +86,5 @@ app.include_router(subcategory.router)
 # Product Images
 app.include_router(product_image.router)
 
+app.include_router(order.router)
 
