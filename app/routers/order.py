@@ -8,7 +8,11 @@ import smtplib
 from datetime import datetime
 from decimal import Decimal
 from email.message import EmailMessage
-from typing import Any
+from typing import Any, Optional
+from datetime import datetime, date, time, timedelta
+from zoneinfo import ZoneInfo
+
+from fastapi import Query
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -449,26 +453,153 @@ def get_order_by_id(
 
 
 # ==========================================================
+# GET INDIA CURRENT DATE
+# ==========================================================
+
+def get_india_today() -> date:
+    return datetime.now(
+        ZoneInfo("Asia/Kolkata")
+    ).date()
+
+
+# ==========================================================
 # GET ALL ORDERS
+# DEFAULT: INDIA TODAY'S ORDERS ONLY
+# WITH DATE FILTER AND PAGINATION
 # ==========================================================
 
 @router.get("/")
 def get_all_orders(
+    start_date: Optional[date] = Query(
+        default=None,
+        description="Start date in YYYY-MM-DD format"
+    ),
+    end_date: Optional[date] = Query(
+        default=None,
+        description="End date in YYYY-MM-DD format"
+    ),
+    page: int = Query(
+        default=1,
+        ge=1,
+        description="Page number"
+    ),
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=100,
+        description="Number of orders per page"
+    ),
     db: Session = Depends(get_db)
 ):
+    # ------------------------------------------------------
+    # DEFAULT DATE = INDIA TODAY
+    # ------------------------------------------------------
+
+    today = get_india_today()
+
+    if start_date is None and end_date is None:
+        start_date = today
+        end_date = today
+
+    elif start_date is not None and end_date is None:
+        end_date = start_date
+
+    elif start_date is None and end_date is not None:
+        start_date = end_date
+
+    # ------------------------------------------------------
+    # VALIDATE DATE RANGE
+    # ------------------------------------------------------
+
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date cannot be greater than end_date"
+        )
+
+    # ------------------------------------------------------
+    # CONVERT INDIA DATE TO UTC DATETIME
+    # ------------------------------------------------------
+
+    india_timezone = ZoneInfo("Asia/Kolkata")
+
+    start_india_datetime = datetime.combine(
+        start_date,
+        time.min
+    ).replace(
+        tzinfo=india_timezone
+    )
+
+    end_india_datetime = datetime.combine(
+        end_date + timedelta(days=1),
+        time.min
+    ).replace(
+        tzinfo=india_timezone
+    )
+
+    # Database created_at is stored using UTC datetime.
+    # Convert India date range into UTC before querying.
+
+    start_utc_datetime = start_india_datetime.astimezone(
+        ZoneInfo("UTC")
+    ).replace(tzinfo=None)
+
+    end_utc_datetime = end_india_datetime.astimezone(
+        ZoneInfo("UTC")
+    ).replace(tzinfo=None)
+
+    # ------------------------------------------------------
+    # FILTER ORDERS
+    # ------------------------------------------------------
+
+    query = (
+        db.query(Order)
+        .filter(
+            Order.is_active.is_(True),
+            Order.created_at >= start_utc_datetime,
+            Order.created_at < end_utc_datetime
+        )
+        .order_by(Order.id.desc())
+    )
+
+    # ------------------------------------------------------
+    # TOTAL COUNT
+    # ------------------------------------------------------
+
+    total_orders = query.count()
+
+    if total_orders == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No orders found for the selected date range"
+        )
+
+    # ------------------------------------------------------
+    # PAGINATION
+    # ------------------------------------------------------
+
+    offset = (page - 1) * limit
 
     orders = (
-        db.query(Order)
-        .filter(Order.is_active.is_(True))
-        .order_by(Order.id.desc())
+        query
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 
     if not orders:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No orders found"
+            detail="No orders found for this page"
         )
+
+    total_pages = (
+        total_orders + limit - 1
+    ) // limit
+
+    # ------------------------------------------------------
+    # RESPONSE DATA
+    # ------------------------------------------------------
 
     response_data: list[dict[str, Any]] = []
 
@@ -515,8 +646,27 @@ def get_all_orders(
             }
         )
 
+    # ------------------------------------------------------
+    # FINAL RESPONSE
+    # ------------------------------------------------------
+
     return {
         "status": True,
         "message": "Orders fetched successfully",
+
+        "filters": {
+            "start_date": start_date,
+            "end_date": end_date
+        },
+
+        "pagination": {
+            "current_page": page,
+            "per_page": limit,
+            "total_orders": total_orders,
+            "total_pages": total_pages,
+            "has_next_page": page < total_pages,
+            "has_previous_page": page > 1
+        },
+
         "data": response_data
     }
