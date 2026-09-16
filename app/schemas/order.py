@@ -28,35 +28,33 @@ class CustomerDetails(BaseModel):
     )
 
     address_type: Optional[str] = Field(
-        default=None,
+        default="",
         max_length=50
     )
 
     address_line_1: Optional[str] = Field(
-        default=None,
-        min_length=1,
+        default="",
         max_length=255
     )
 
-    address_line_2: Optional[str] = None
+    address_line_2: Optional[str] = ""
 
     city: Optional[str] = Field(
-        default=None,
+        default="",
         max_length=100
     )
 
     state: Optional[str] = Field(
-        default=None,
+        default="",
         max_length=100
     )
 
     pincode: Optional[str] = Field(
-        default=None,
-        min_length=4,
+        default="",
         max_length=10
     )
 
-    landmark: Optional[str] = None
+    landmark: Optional[str] = ""
 
 
 # ==========================================================
