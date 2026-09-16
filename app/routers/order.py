@@ -36,16 +36,18 @@ router = APIRouter(
 
 # ==========================================================
 # GENERATE SHORT ORDER NUMBER
-# Format: VS-260914-01
+# Format: VS-16092026-01
 # ==========================================================
 
 def generate_order_number(db: Session) -> str:
-    today = datetime.utcnow().strftime("%y%m%d")
+    today = datetime.utcnow().strftime("%d%m%Y")
     prefix = f"VS-{today}-"
 
     last_order = (
         db.query(Order)
-        .filter(Order.order_number.like(f"{prefix}%"))
+        .filter(
+            Order.order_number.like(f"{prefix}%")
+        )
         .order_by(Order.id.desc())
         .first()
     )
@@ -54,7 +56,9 @@ def generate_order_number(db: Session) -> str:
         last_sequence = int(
             last_order.order_number.split("-")[-1]
         )
+
         next_sequence = last_sequence + 1
+
     else:
         next_sequence = 1
 
