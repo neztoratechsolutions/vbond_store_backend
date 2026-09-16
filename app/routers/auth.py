@@ -59,7 +59,7 @@ def register(
         phone = data. phone ,
         password=data.password,
         password_hash = hash_password(data.password),
-        role = "CUSTOMER",
+        role = "ADMIN",
         is_active = True
     )
 

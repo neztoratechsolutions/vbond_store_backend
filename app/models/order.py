@@ -7,8 +7,8 @@ from sqlalchemy import (
     Numeric,
     Boolean,
     DateTime,
-    ForeignKey,
     Text,
+    JSON,
 )
 
 from app.database import Base
@@ -17,7 +17,11 @@ from app.database import Base
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     order_number = Column(
         String(50),
@@ -26,18 +30,9 @@ class Order(Base):
         index=True
     )
 
-    customer_id = Column(
-        Integer,
-        ForeignKey("customers.id"),
-        nullable=False,
-        index=True
-    )
-
-    address_id = Column(
-        Integer,
-        ForeignKey("customer_addresses.id"),
-        nullable=False,
-        index=True
+    customer_details = Column(
+        JSON,
+        nullable=False
     )
 
     subtotal = Column(
