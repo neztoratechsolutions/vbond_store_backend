@@ -9,7 +9,7 @@ from app.routers import unit
 from app.routers import product
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
+from app.models.order import Order
 from app.database import Base, engine
 
 # Models
@@ -30,7 +30,7 @@ from app.routers import unit
 from app.routers import category
 from app.routers import subcategory
 from app.routers import product_image
-
+from app.routers import order
 
 Base.metadata.create_all(bind=engine)
 
@@ -83,5 +83,6 @@ app.include_router(subcategory.router)
 
 # Product Images
 app.include_router(product_image.router)
+app.include_router(order.router)
 
 
