@@ -32,6 +32,7 @@ from app.routers import category
 from app.routers import subcategory
 from app.routers import product_image
 from app.routers import order
+from app.routers import order_report
 
 
 Base.metadata.create_all(bind=engine)
@@ -87,4 +88,6 @@ app.include_router(subcategory.router)
 app.include_router(product_image.router)
 
 app.include_router(order.router)
+
+app.include_router(order_report.router)
 
