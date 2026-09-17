@@ -10,6 +10,11 @@ from fastapi import (
 )
 
 from sqlalchemy.orm import Session
+from datetime import date, datetime, time, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
+
+from fastapi import Query
 
 import re
 
@@ -204,43 +209,166 @@ def create_subcategories(
     }
 
 
+
 # ==========================================================
 # GET ALL SUBCATEGORIES
 # Active + Inactive
+# Pagination + Date Filter
 # ==========================================================
 
 @router.get("/")
 def get_all_subcategories(
+    start_date: Optional[date] = Query(
+        default=None,
+        description="Start date in YYYY-MM-DD format"
+    ),
+    end_date: Optional[date] = Query(
+        default=None,
+        description="End date in YYYY-MM-DD format"
+    ),
+    page: int = Query(
+        default=1,
+        ge=1,
+        description="Page number"
+    ),
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=100,
+        description="Number of subcategories per page"
+    ),
     db: Session = Depends(get_db)
 ):
 
-    subcategories = (
-        db.query(Subcategory)
-        .order_by(
-            Subcategory.display_order.asc(),
-            Subcategory.id.asc()
+    # ------------------------------------------------------
+    # VALIDATE DATE RANGE
+    # ------------------------------------------------------
+
+    if start_date and end_date:
+        if start_date > end_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_date cannot be greater than end_date"
+            )
+
+    # ------------------------------------------------------
+    # BASE QUERY
+    # ------------------------------------------------------
+
+    subcategories_query = db.query(Subcategory)
+
+    # ------------------------------------------------------
+    # DATE FILTER
+    # ------------------------------------------------------
+
+    if start_date or end_date:
+
+        india_timezone = ZoneInfo("Asia/Kolkata")
+
+        if start_date is None:
+            start_date = end_date
+
+        if end_date is None:
+            end_date = start_date
+
+        start_india_datetime = datetime.combine(
+            start_date,
+            time.min
+        ).replace(
+            tzinfo=india_timezone
         )
-        .all()
+
+        # end_date is inclusive
+        end_india_datetime = datetime.combine(
+            end_date + timedelta(days=1),
+            time.min
+        ).replace(
+            tzinfo=india_timezone
+        )
+
+        start_utc_datetime = start_india_datetime.astimezone(
+            ZoneInfo("UTC")
+        ).replace(
+            tzinfo=None
+        )
+
+        end_utc_datetime = end_india_datetime.astimezone(
+            ZoneInfo("UTC")
+        ).replace(
+            tzinfo=None
+        )
+
+        subcategories_query = subcategories_query.filter(
+            Subcategory.created_at >= start_utc_datetime,
+            Subcategory.created_at < end_utc_datetime
+        )
+
+    # ------------------------------------------------------
+    # ORDER BY
+    # ------------------------------------------------------
+
+    subcategories_query = subcategories_query.order_by(
+        Subcategory.display_order.asc(),
+        Subcategory.id.asc()
     )
 
     # ------------------------------------------------------
-    # No subcategories
+    # TOTAL COUNT
     # ------------------------------------------------------
 
-    if not subcategories:
+    total_subcategories = subcategories_query.count()
 
+    if total_subcategories == 0:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No subcategories found"
+            detail="No subcategories found for the selected date range"
         )
 
     # ------------------------------------------------------
-    # Response
+    # PAGINATION
+    # ------------------------------------------------------
+
+    offset = (page - 1) * limit
+
+    subcategories = (
+        subcategories_query
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    if not subcategories:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No subcategories found for this page"
+        )
+
+    total_pages = (
+        total_subcategories + limit - 1
+    ) // limit
+
+    # ------------------------------------------------------
+    # RESPONSE
     # ------------------------------------------------------
 
     return {
         "status_code": 200,
         "message": "All subcategories fetched successfully",
+
+        "filters": {
+            "start_date": start_date,
+            "end_date": end_date
+        },
+
+        "pagination": {
+            "current_page": page,
+            "per_page": limit,
+            "total_subcategories": total_subcategories,
+            "total_pages": total_pages,
+            "has_next_page": page < total_pages,
+            "has_previous_page": page > 1
+        },
+
         "count": len(subcategories),
         "subcategories": subcategories
     }
