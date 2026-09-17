@@ -22,7 +22,12 @@ from app.database import get_db
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
-from app.schemas.order import OrderCreate
+from app.schemas.order import OrderCreate , AdminOrderUpdate
+from app.models.delivery import Delivery
+from app.models.order_status_history import OrderStatusHistory
+from app.dependencies import require_role
+from app.models.user import User
+
 
 
 load_dotenv()
@@ -673,4 +678,226 @@ def get_all_orders(
         },
 
         "data": response_data
+    }
+
+
+# ==========================================================
+# ADMIN ORDER UPDATE
+# ==========================================================
+
+@router.put(
+    "/{order_id}/admin-update"
+)
+def admin_update_order(
+    order_id: int,
+    data: AdminOrderUpdate,
+    current_user: User = Depends(
+        require_role("ADMIN")
+    ),
+    db: Session = Depends(get_db)
+):
+
+    # ------------------------------------------------------
+    # FIND ORDER
+    # ------------------------------------------------------
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id,
+            Order.is_active.is_(True)
+        )
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    # ------------------------------------------------------
+    # CHECK THAT SOMETHING WAS PROVIDED
+    # ------------------------------------------------------
+
+    update_data = data.model_dump(
+        exclude_unset=True
+    )
+
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No update data provided"
+        )
+
+    # ------------------------------------------------------
+    # UPDATE ORDER STATUS
+    # ------------------------------------------------------
+
+    if data.order_status is not None:
+
+        old_status = order.order_status
+
+        order.order_status = data.order_status
+
+        # Save status history
+        if old_status != data.order_status:
+
+            history = OrderStatusHistory(
+                order_id=order.id,
+                old_status=old_status,
+                new_status=data.order_status,
+                changed_by=current_user.name,
+                note="Order status updated by admin"
+            )
+
+            db.add(history)
+
+    # ------------------------------------------------------
+    # UPDATE PAYMENT
+    # ------------------------------------------------------
+
+    if data.payment_status is not None:
+        order.payment_status = data.payment_status
+
+    if data.payment_method is not None:
+        order.payment_method = data.payment_method
+
+    # ------------------------------------------------------
+    # FIND DELIVERY RECORD
+    # ------------------------------------------------------
+
+    delivery = (
+        db.query(Delivery)
+        .filter(
+            Delivery.order_id == order.id
+        )
+        .first()
+    )
+
+    # Create delivery record if it doesn't exist
+    if delivery is None:
+
+        delivery = Delivery(
+            order_id=order.id,
+            delivery_status="PENDING"
+        )
+
+        db.add(delivery)
+        db.flush()
+
+    # ------------------------------------------------------
+    # UPDATE DELIVERY
+    # ------------------------------------------------------
+
+    if data.delivery_status is not None:
+        delivery.delivery_status = data.delivery_status
+
+    if data.delivery_person_name is not None:
+        delivery.delivery_person_name = (
+            data.delivery_person_name
+        )
+
+    if data.delivery_person_phone is not None:
+        delivery.delivery_person_phone = (
+            data.delivery_person_phone
+        )
+
+    if data.tracking_number is not None:
+        delivery.tracking_number = (
+            data.tracking_number
+        )
+
+    if data.estimated_delivery_date is not None:
+        delivery.estimated_delivery_date = (
+            data.estimated_delivery_date
+        )
+
+    if data.delivery_note is not None:
+        delivery.delivery_note = (
+            data.delivery_note
+        )
+
+    # ------------------------------------------------------
+    # AUTOMATIC DELIVERY TIMESTAMPS
+    # ------------------------------------------------------
+
+    if (
+        data.delivery_status == "PICKED_UP"
+        and delivery.picked_up_at is None
+    ):
+        delivery.picked_up_at = datetime.utcnow()
+
+    if (
+        data.delivery_status == "DELIVERED"
+        and delivery.delivered_at is None
+    ):
+        delivery.delivered_at = datetime.utcnow()
+
+    # ------------------------------------------------------
+    # SAVE
+    # ------------------------------------------------------
+
+    try:
+
+        db.commit()
+
+        db.refresh(order)
+        db.refresh(delivery)
+
+    except Exception:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order update failed"
+        )
+
+    # ------------------------------------------------------
+    # RESPONSE
+    # ------------------------------------------------------
+
+    return {
+        "status": True,
+        "message": "Order updated successfully",
+        "data": {
+            "order_id": order.id,
+            "order_number": order.order_number,
+
+            "order_status": order.order_status,
+
+            "payment": {
+                "payment_method": order.payment_method,
+                "payment_status": order.payment_status
+            },
+
+            "delivery": {
+                "delivery_id": delivery.id,
+                "delivery_status": delivery.delivery_status,
+                "delivery_person_name": (
+                    delivery.delivery_person_name
+                ),
+                "delivery_person_phone": (
+                    delivery.delivery_person_phone
+                ),
+                "tracking_number": (
+                    delivery.tracking_number
+                ),
+                "estimated_delivery_date": (
+                    delivery.estimated_delivery_date
+                ),
+                "picked_up_at": delivery.picked_up_at,
+                "delivered_at": delivery.delivered_at,
+                "delivery_note": delivery.delivery_note
+            },
+
+            "updated_by": {
+                "user_id": current_user.id,
+                "name": current_user.name,
+                "role": current_user.role
+            },
+
+            "updated_at": order.updated_at
+        }
     }

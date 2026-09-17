@@ -1,5 +1,6 @@
 from decimal import Decimal
 from typing import Optional
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -80,3 +81,28 @@ class OrderCreate(BaseModel):
     )
 
     customer_note: Optional[str] = None
+
+
+# ==========================================================
+# ADMIN ORDER UPDATE
+# ==========================================================
+
+class AdminOrderUpdate(BaseModel):
+
+    order_status: Optional[str] = None
+
+    payment_status: Optional[str] = None
+
+    payment_method: Optional[str] = None
+
+    delivery_status: Optional[str] = None
+
+    delivery_person_name: Optional[str] = None
+
+    delivery_person_phone: Optional[str] = None
+
+    tracking_number: Optional[str] = None
+
+    estimated_delivery_date: Optional[datetime] = None
+
+    delivery_note: Optional[str] = None
