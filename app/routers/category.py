@@ -8,8 +8,13 @@ from fastapi import (
     HTTPException,
     status
 )
-
+from fastapi import Query
 from sqlalchemy.orm import Session
+from datetime import date, datetime, time, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
+
+from fastapi import Query
 
 import re
 
@@ -179,44 +184,165 @@ def create_categories(
         "categories": created_categories
     }
 
-
 # ==========================================================
 # GET ALL CATEGORIES
 # Active + Inactive
+# Pagination + Date Filter
 # ==========================================================
 
 @router.get("/")
 def get_all_categories(
+    start_date: Optional[date] = Query(
+        default=None,
+        description="Start date in YYYY-MM-DD format"
+    ),
+    end_date: Optional[date] = Query(
+        default=None,
+        description="End date in YYYY-MM-DD format"
+    ),
+    page: int = Query(
+        default=1,
+        ge=1,
+        description="Page number"
+    ),
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=100,
+        description="Number of categories per page"
+    ),
     db: Session = Depends(get_db)
 ):
 
-    categories = (
-        db.query(Category)
-        .order_by(
-            Category.display_order.asc(),
-            Category.id.asc()
+    # ------------------------------------------------------
+    # VALIDATE DATE RANGE
+    # ------------------------------------------------------
+
+    if start_date and end_date:
+        if start_date > end_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_date cannot be greater than end_date"
+            )
+
+    # ------------------------------------------------------
+    # CATEGORY QUERY
+    # ------------------------------------------------------
+
+    categories_query = db.query(Category)
+
+    # ------------------------------------------------------
+    # DATE FILTER
+    # ------------------------------------------------------
+
+    if start_date or end_date:
+
+        india_timezone = ZoneInfo("Asia/Kolkata")
+
+        if start_date is None:
+            start_date = end_date
+
+        if end_date is None:
+            end_date = start_date
+
+        start_india_datetime = datetime.combine(
+            start_date,
+            time.min
+        ).replace(
+            tzinfo=india_timezone
         )
-        .all()
+
+        # end_date + 1 day makes the end date inclusive
+        end_india_datetime = datetime.combine(
+            end_date + timedelta(days=1),
+            time.min
+        ).replace(
+            tzinfo=india_timezone
+        )
+
+        start_utc_datetime = start_india_datetime.astimezone(
+            ZoneInfo("UTC")
+        ).replace(
+            tzinfo=None
+        )
+
+        end_utc_datetime = end_india_datetime.astimezone(
+            ZoneInfo("UTC")
+        ).replace(
+            tzinfo=None
+        )
+
+        categories_query = categories_query.filter(
+            Category.created_at >= start_utc_datetime,
+            Category.created_at < end_utc_datetime
+        )
+
+    # ------------------------------------------------------
+    # ORDER BY
+    # ------------------------------------------------------
+
+    categories_query = categories_query.order_by(
+        Category.display_order.asc(),
+        Category.id.asc()
     )
 
     # ------------------------------------------------------
-    # No categories
+    # TOTAL COUNT
     # ------------------------------------------------------
 
-    if not categories:
+    total_categories = categories_query.count()
 
+    if total_categories == 0:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No categories found"
+            detail="No categories found for the selected date range"
         )
 
     # ------------------------------------------------------
-    # Response
+    # PAGINATION
+    # ------------------------------------------------------
+
+    offset = (page - 1) * limit
+
+    categories = (
+        categories_query
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    if not categories:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No categories found for this page"
+        )
+
+    total_pages = (
+        total_categories + limit - 1
+    ) // limit
+
+    # ------------------------------------------------------
+    # RESPONSE
     # ------------------------------------------------------
 
     return {
         "status_code": 200,
         "message": "All categories fetched successfully",
+
+        "filters": {
+            "start_date": start_date,
+            "end_date": end_date
+        },
+
+        "pagination": {
+            "current_page": page,
+            "per_page": limit,
+            "total_categories": total_categories,
+            "total_pages": total_pages,
+            "has_next_page": page < total_pages,
+            "has_previous_page": page > 1
+        },
+
         "count": len(categories),
         "categories": categories
     }
