@@ -907,3 +907,84 @@ def admin_update_order(
         }
 
     }
+
+
+
+# ==========================================================
+# ADMIN ORDER DELETE
+# ==========================================================
+
+@router.delete(
+    "/{order_id}/admin-delete"
+)
+def admin_delete_order(
+    order_id: int,
+    current_user: User = Depends(
+        require_role("ADMIN")
+    ),
+    db: Session = Depends(get_db)
+):
+
+    # ------------------------------------------------------
+    # FIND ORDER
+    # ------------------------------------------------------
+
+    order = (
+        db.query(Order)
+        .filter(
+            Order.id == order_id,
+            Order.is_active.is_(True)
+        )
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    # ------------------------------------------------------
+    # SOFT DELETE
+    # ------------------------------------------------------
+
+    order.is_active = False
+
+    # ------------------------------------------------------
+    # SAVE
+    # ------------------------------------------------------
+
+    try:
+
+        db.commit()
+
+        db.refresh(order)
+
+    except Exception:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order deletion failed"
+        )
+
+    # ------------------------------------------------------
+    # RESPONSE
+    # ------------------------------------------------------
+
+    return {
+        "status": True,
+        "message": "Order deleted successfully",
+        "data": {
+            "order_id": order.id,
+            "order_number": order.order_number,
+            "is_active": order.is_active,
+            "deleted_by": {
+                "user_id": current_user.id,
+                "name": current_user.name,
+                "role": current_user.role
+            },
+            "deleted_at": order.updated_at
+        }
+    }
