@@ -212,15 +212,53 @@ def create_product(
 # GET /products
 # =========================================================
 
+from datetime import date, datetime, time, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
 
-@router.get(
-    "",
-    response_model=list[ProductResponse]
-)
+from fastapi import Query
+
+
+@router.get("")
 def get_products(
+    start_date: Optional[date] = Query(
+        default=None,
+        description="Start date in YYYY-MM-DD format"
+    ),
+    end_date: Optional[date] = Query(
+        default=None,
+        description="End date in YYYY-MM-DD format"
+    ),
+    page: int = Query(
+        default=1,
+        ge=1,
+        description="Page number"
+    ),
+    limit: int = Query(
+        default=10,
+        ge=1,
+        le=100,
+        description="Number of products per page"
+    ),
     db: Session = Depends(get_db)
 ):
-    results = (
+
+    # =====================================================
+    # DATE VALIDATION
+    # =====================================================
+
+    if start_date and end_date:
+        if start_date > end_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_date cannot be greater than end_date"
+            )
+
+    # =====================================================
+    # BASE QUERY
+    # =====================================================
+
+    products_query = (
         db.query(
             Product,
             Subcategory,
@@ -234,12 +272,119 @@ def get_products(
             Category,
             Subcategory.category_id == Category.id
         )
-        .order_by(
-            Product.display_order.asc(),
-            Product.id.desc()
+    )
+
+    # =====================================================
+    # DATE FILTER
+    # INDIA DATE -> UTC
+    # =====================================================
+
+    if start_date or end_date:
+
+        india_timezone = ZoneInfo("Asia/Kolkata")
+
+        # If only one date is provided,
+        # use the same date for both
+        if start_date is None:
+            start_date = end_date
+
+        if end_date is None:
+            end_date = start_date
+
+        # Start of start_date in India
+        start_india_datetime = datetime.combine(
+            start_date,
+            time.min
+        ).replace(
+            tzinfo=india_timezone
         )
+
+        # Start of the day AFTER end_date
+        # This makes end_date inclusive
+        end_india_datetime = datetime.combine(
+            end_date + timedelta(days=1),
+            time.min
+        ).replace(
+            tzinfo=india_timezone
+        )
+
+        # Convert India time to UTC
+        start_utc_datetime = (
+            start_india_datetime
+            .astimezone(ZoneInfo("UTC"))
+            .replace(tzinfo=None)
+        )
+
+        end_utc_datetime = (
+            end_india_datetime
+            .astimezone(ZoneInfo("UTC"))
+            .replace(tzinfo=None)
+        )
+
+        products_query = products_query.filter(
+            Product.created_at >= start_utc_datetime,
+            Product.created_at < end_utc_datetime
+        )
+
+    # =====================================================
+    # ORDER BY
+    # =====================================================
+
+    products_query = products_query.order_by(
+        Product.display_order.asc(),
+        Product.id.desc()
+    )
+
+    # =====================================================
+    # TOTAL COUNT
+    # =====================================================
+
+    total_products = products_query.count()
+
+    if total_products == 0:
+
+        if start_date or end_date:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No products found for the selected date range"
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No products found"
+        )
+
+    # =====================================================
+    # PAGINATION
+    # =====================================================
+
+    offset = (page - 1) * limit
+
+    results = (
+        products_query
+        .offset(offset)
+        .limit(limit)
         .all()
     )
+
+    # Page doesn't contain data
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No products found for this page"
+        )
+
+    # =====================================================
+    # TOTAL PAGES
+    # =====================================================
+
+    total_pages = (
+        total_products + limit - 1
+    ) // limit
+
+    # =====================================================
+    # RESPONSE
+    # =====================================================
 
     response = []
 
@@ -260,6 +405,7 @@ def get_products(
             "is_available": product.is_available,
             "is_active": product.is_active,
             "display_order": product.display_order,
+
             "created_at": product.created_at,
             "updated_at": product.updated_at,
 
@@ -276,7 +422,28 @@ def get_products(
 
         response.append(product_data)
 
-    return response
+    return {
+        "status_code": 200,
+        "message": "Products retrieved successfully",
+
+        "filters": {
+            "start_date": start_date,
+            "end_date": end_date
+        },
+
+        "pagination": {
+            "current_page": page,
+            "per_page": limit,
+            "total_products": total_products,
+            "total_pages": total_pages,
+            "has_next_page": page < total_pages,
+            "has_previous_page": page > 1
+        },
+
+        "count": len(response),
+
+        "data": response
+    }
 
 # =========================================================
 # GET SINGLE PRODUCT
