@@ -93,6 +93,11 @@ class Order(Base):
         default=True
     )
 
+    delivery_date = Column(
+    DateTime,
+    nullable=True
+)
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow
@@ -103,3 +108,5 @@ class Order(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
+
+    

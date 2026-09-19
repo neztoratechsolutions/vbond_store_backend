@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -88,21 +88,7 @@ class OrderCreate(BaseModel):
 # ==========================================================
 
 class AdminOrderUpdate(BaseModel):
-
-    order_status: Optional[str] = None
-
+    order_status: Optional[Literal["PLACED", "DELIVERED"]] = None
     payment_status: Optional[str] = None
-
     payment_method: Optional[str] = None
-
-    delivery_status: Optional[str] = None
-
-    delivery_person_name: Optional[str] = None
-
-    delivery_person_phone: Optional[str] = None
-
-    tracking_number: Optional[str] = None
-
-    estimated_delivery_date: Optional[datetime] = None
-
-    delivery_note: Optional[str] = None
+    delivery_date: Optional[datetime] = None
