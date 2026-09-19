@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 # ==========================================================
 
 class CustomerDetails(BaseModel):
+
     name: str = Field(
         ...,
         min_length=1,
@@ -60,11 +61,10 @@ class CustomerDetails(BaseModel):
 
 
 # ==========================================================
-# CREATE ORDER
+# ORDER PRODUCT
 # ==========================================================
 
-class OrderCreate(BaseModel):
-    customer_details: CustomerDetails
+class OrderProduct(BaseModel):
 
     product_id: int = Field(
         ...,
@@ -76,11 +76,24 @@ class OrderCreate(BaseModel):
         gt=0
     )
 
+
+# ==========================================================
+# CREATE ORDER
+# ==========================================================
+
+class OrderCreate(BaseModel):
+
+    customer_details: CustomerDetails
+
+    products: list[OrderProduct] = Field(
+        ...,
+        min_length=1
+    )
+
     payment_method: str = Field(
         default="COD",
         max_length=50
     )
-
 
     customer_note: Optional[str] = None
 
@@ -108,4 +121,3 @@ class AdminOrderUpdate(BaseModel):
     estimated_delivery_date: Optional[datetime] = None
 
     delivery_note: Optional[str] = None
-
