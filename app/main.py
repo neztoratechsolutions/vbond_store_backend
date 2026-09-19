@@ -1,15 +1,7 @@
 from fastapi import FastAPI
-from app.database import Base, engine
-from app.models.user import User
-
-from app.routers.auth import router as auth_router
-from app.routers import customer
-from app.routers import admin
-from app.routers import unit
-from app.routers import product
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.models.order import Order
+
 from app.database import Base, engine
 
 # Models
@@ -28,11 +20,11 @@ from app.routers import customer
 from app.routers import address
 from app.routers import admin
 from app.routers import unit
+from app.routers import product
 from app.routers import category
 from app.routers import subcategory
 from app.routers import product_image
 from app.routers import order
-
 from app.routers import order_report
 
 
@@ -43,6 +35,7 @@ app = FastAPI(
     title="VBOND Store API",
     version="1.0.0",
 )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,6 +49,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 app.mount(
     "/uploads",
     StaticFiles(directory="uploads"),
@@ -63,34 +58,28 @@ app.mount(
 )
 
 
-# Authentication
+# ==========================================================
+# ROUTERS
+# ==========================================================
+
 app.include_router(auth_router)
 
-# Customer
 app.include_router(customer.router)
 
-# Admin
 app.include_router(admin.router)
 
-# Unit
 app.include_router(unit.router)
 
 app.include_router(product.router)
 
-# Address
 app.include_router(address.router)
 
-# Category
 app.include_router(category.router)
 
-# Subcategory
 app.include_router(subcategory.router)
 
-# Product Images
 app.include_router(product_image.router)
-app.include_router(order.router)
 
 app.include_router(order.router)
 
 app.include_router(order_report.router)
-
